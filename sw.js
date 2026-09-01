@@ -2,12 +2,13 @@ const CACHE = 'brasil-2026-v1';
 const SHELL = [
   './',
   './index.html',
-  './css/style.css',
-  './js/config.js',
-  './js/api.js',
-  './js/state.js',
-  './js/views.js',
-  './js/app.js',
+  './style.css',
+  './config.js',
+  './schemas.js',
+  './api.js',
+  './state.js',
+  './views.js',
+  './app.js',
   './manifest.json'
 ];
 
