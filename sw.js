@@ -1,4 +1,4 @@
-const CACHE = 'brasil-2026-v1';
+const CACHE = 'brasil-2026-v3';
 const SHELL = [
   './',
   './index.html',
@@ -9,7 +9,8 @@ const SHELL = [
   './state.js',
   './views.js',
   './app.js',
-  './manifest.json'
+  './manifest.json',
+  './nosotros.jpg'
 ];
 
 self.addEventListener('install', (e) => {

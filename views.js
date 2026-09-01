@@ -31,14 +31,14 @@ function renderDashboard() {
   const cfg = State.config;
   const days = State.daysUntil(cfg.departureDate);
   const phase = State.tripPhase();
-  let flag = `⏳ FALTAN ${days} DÍAS`;
+  let flag = `FALTAN ${days} DÍAS`;
   if (phase === 'start') flag = '🚗 ¡HOY COMIENZA EL VIAJE!';
   if (phase === 'during') flag = '🌴 VIAJE EN CURSO';
   if (phase === 'post') flag = '🏠 VIAJE FINALIZADO';
 
   const cash = State.cashSummary();
-  const mainCash = cash.BRL && (cash.BRL.in || cash.BRL.out) ? cash.BRL : cash.ARS;
   const mainCur = cash.BRL && (cash.BRL.in || cash.BRL.out) ? 'BRL' : 'ARS';
+  const mainCash = cash[mainCur];
 
   const budget = State.budgetRows();
   const totalBudget = budget.reduce((s, b) => s + (Number(b.budgetAmount) || 0), 0);
@@ -57,59 +57,51 @@ function renderDashboard() {
   const today = new Date().toISOString().slice(0, 10);
   const todayItin = State.itineraryForDate(today);
 
+  const accPaid = Number(cfg.accommodationPaid) || 0;
+  const accTotal = Number(cfg.accommodationTotalPrice) || 0;
+  const accPending = accTotal - accPaid;
+
+  const kpis = [
+    { label: 'Gasto total', value: fmt(totalSpent, 'BRL'), sub: totalBudget ? 'de ' + fmt(totalBudget, 'BRL') + ' presupuestado' : '', cls: 'coral' },
+    { label: 'Caja ' + mainCur, value: fmt(mainCash ? mainCash.balance : 0, mainCur), sub: 'saldo disponible', cls: 'gold' },
+    { label: 'Alojamiento', value: fmt(accPaid, cfg.accommodationCurrency), sub: accPending > 0 ? 'pendiente ' + fmt(accPending, cfg.accommodationCurrency) : 'pagado por completo', cls: 'seafoam' },
+    { label: 'Combustible', value: fuel ? fuel.tanksRounded + ' tanques' : '—', sub: fuel ? fmt(fuel.cost, 'ARS') : 'cargá una ruta', cls: 'gold' },
+    { label: 'Presupuesto disponible', value: fmt(totalBudget - totalSpent, 'BRL'), sub: totalBudget ? Math.round((totalSpent / totalBudget) * 100) + '% usado' : 'sin definir', cls: (totalSpent > totalBudget && totalBudget > 0) ? 'danger' : 'seafoam' },
+    { label: 'Tareas', value: pendingTasks, sub: overdueTasks ? overdueTasks + ' vencidas' : 'pendientes', cls: overdueTasks ? 'danger' : 'seafoam' },
+    { label: 'Compras', value: pendingPurchases, sub: 'pendientes', cls: 'coral' },
+    { label: 'Auto', value: pendingMaintenance, sub: 'mantenimientos pendientes', cls: pendingMaintenance ? 'warn' : 'seafoam' }
+  ];
+
+  const kpiHtml = kpis.map((k) => `
+    <div class="kpi ${k.cls}">
+      <div class="kpi-label">${esc(k.label)}</div>
+      <div class="kpi-value">${k.value}</div>
+      ${k.sub ? `<div class="kpi-sub">${esc(k.sub)}</div>` : ''}
+    </div>
+  `).join('');
+
   return `
     <div class="countdown-hero">
       <div class="flag">🇧🇷 ${esc(cfg.tripName || 'VIAJE A BRASIL')} · ${esc(cfg.travelerA)} ❤️ ${esc(cfg.travelerB)}</div>
       <div class="countdown-number">${{ pre: days, start: '🚗', during: '🌴', post: '🏠' }[phase]}</div>
       <div class="countdown-label">${flag}</div>
-    </div>
-
-    <div class="card">
-      <div class="card-title">🚗 Roadtrip · ${esc(cfg.origin || '')} → ${esc(cfg.destination || '')}</div>
-      <div class="grid-3">
-        <div class="stat"><div class="stat-value">${totalKm || '—'}</div><div class="stat-label">Kilómetros</div></div>
-        <div class="stat"><div class="stat-value">${totalHours || '—'}</div><div class="stat-label">Horas</div></div>
-        <div class="stat coral"><div class="stat-value">${fuel ? fuel.tanksRounded : '—'}</div><div class="stat-label">Tanques</div></div>
-      </div>
-      ${fuel ? `<div class="summary-row mt-8"><span class="label">Combustible estimado</span><span class="value">${fmt(fuel.cost, 'ARS')}</span></div>` : ''}
-    </div>
-
-    <div class="card">
-      <div class="card-title">🏠 Alojamiento</div>
-      <div class="summary-row"><span class="label">Estadía</span><span class="value">${fmtDate(cfg.checkIn)} → ${fmtDate(cfg.checkOutLimit)}</span></div>
-      <div class="summary-row"><span class="label">Check-in</span><span class="value">${cfg.checkIn ? cfg.checkIn.slice(11, 16) : '—'}</span></div>
-      <div class="summary-row"><span class="label">Check-out límite</span><span class="value">${cfg.checkOutLimit ? cfg.checkOutLimit.slice(11, 16) : '—'}</span></div>
-      <div class="summary-row"><span class="label">Salida prevista (regreso)</span><span class="value">${cfg.plannedReturnDeparture ? cfg.plannedReturnDeparture.slice(11, 16) : '—'}</span></div>
-    </div>
-
-    <div class="card">
-      <div class="card-title">💰 Caja del viaje ${mainCur !== 'ARS' ? '(' + mainCur + ')' : ''}</div>
-      <div class="summary-row"><span class="label">Ingresos</span><span class="value">${fmt(mainCash ? mainCash.in : 0, mainCur)}</span></div>
-      <div class="summary-row"><span class="label">Egresos</span><span class="value">${fmt(mainCash ? mainCash.out : 0, mainCur)}</span></div>
-      <div class="summary-row"><span class="label">Saldo disponible</span><span class="value">${fmt(mainCash ? mainCash.balance : 0, mainCur)}</span></div>
-    </div>
-
-    <div class="card">
-      <div class="card-title">📊 Presupuesto</div>
-      <div class="summary-row"><span class="label">Presupuestado</span><span class="value">${fmt(totalBudget, 'BRL')}</span></div>
-      <div class="summary-row"><span class="label">Gastado</span><span class="value">${fmt(totalSpent, 'BRL')}</span></div>
-      <div class="summary-row"><span class="label">Disponible</span><span class="value">${fmt(totalBudget - totalSpent, 'BRL')}</span></div>
-    </div>
-
-    <div class="grid-2">
-      <div class="card">
-        <div class="card-title">📋 Tareas</div>
-        <div class="stat ${overdueTasks ? 'danger' : ''}"><div class="stat-value">${pendingTasks}</div><div class="stat-label">${overdueTasks ? overdueTasks + ' vencidas' : 'pendientes'}</div></div>
-      </div>
-      <div class="card">
-        <div class="card-title">🛒 Compras</div>
-        <div class="stat coral"><div class="stat-value">${pendingPurchases}</div><div class="stat-label">pendientes</div></div>
+      <div class="hero-meta">
+        <div class="hero-meta-item"><div class="v">${totalKm || '—'} km</div><div class="l">Ruta</div></div>
+        <div class="hero-meta-item"><div class="v">${totalHours || '—'} h</div><div class="l">Viaje</div></div>
+        <div class="hero-meta-item"><div class="v">${fmtDate(cfg.checkIn)} → ${fmtDate(cfg.checkOutLimit)}</div><div class="l">Estadía</div></div>
       </div>
     </div>
 
-    <div class="card">
-      <div class="card-title">🚗 Auto — mantenimientos pendientes</div>
-      <div class="stat ${pendingMaintenance ? 'warn' : ''}"><div class="stat-value">${pendingMaintenance}</div><div class="stat-label">de ${State.Maintenance.length} ítems</div></div>
+    <div class="kpi-grid">${kpiHtml}</div>
+
+    <div class="card chart-card">
+      <div class="card-title">Gastos por categoría</div>
+      <canvas id="chart-gastos-categoria"></canvas>
+    </div>
+
+    <div class="card chart-card">
+      <div class="card-title">Evolución del saldo de caja (${mainCur})</div>
+      <canvas id="chart-caja-evolucion"></canvas>
     </div>
 
     <div class="card">
@@ -118,6 +110,64 @@ function renderDashboard() {
     </div>
   `;
 }
+
+function initDashboardCharts() {
+  if (typeof Chart === 'undefined') return;
+  Object.keys(ChartInstances).forEach((k) => { ChartInstances[k].destroy(); delete ChartInstances[k]; });
+
+  const catEl = document.getElementById('chart-gastos-categoria');
+  if (catEl) {
+    const byCat = State.expensesByCategory();
+    const labels = Object.keys(byCat);
+    const palette = ['#E8B94A', '#FF6B4A', '#6FD3BC', '#45A088', '#E3A63D', '#E56B5C', '#93ACAD', '#C99A2E'];
+    ChartInstances.cat = new Chart(catEl, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{ data: labels.map((l) => byCat[l]), backgroundColor: labels.map((_, i) => palette[i % palette.length]), borderRadius: 4 }]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: '#93ACAD', font: { size: 10 } }, grid: { display: false } },
+          y: { ticks: { color: '#93ACAD', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.08)' } }
+        }
+      }
+    });
+  }
+
+  const cajaEl = document.getElementById('chart-caja-evolucion');
+  if (cajaEl) {
+    const cash = State.cashSummary();
+    const mainCur = cash.BRL && (cash.BRL.in || cash.BRL.out) ? 'BRL' : 'ARS';
+    const points = State.cashBalanceOverTime(mainCur);
+    ChartInstances.caja = new Chart(cajaEl, {
+      type: 'line',
+      data: {
+        labels: points.map((p) => fmtDate(p.date)),
+        datasets: [{
+          data: points.map((p) => p.balance),
+          borderColor: '#6FD3BC',
+          backgroundColor: 'rgba(111,211,188,0.12)',
+          fill: true,
+          tension: 0.3,
+          pointRadius: 2
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: '#93ACAD', font: { size: 10 } }, grid: { display: false } },
+          y: { ticks: { color: '#93ACAD', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.08)' } }
+        }
+      }
+    });
+  }
+}
+
+const ChartInstances = {};
 
 // -------------------------------------------------------------- CAJA
 
@@ -221,10 +271,44 @@ function renderPresupuesto() {
     </div>
   `).join('') : emptyState('Todavía no se definieron categorías de presupuesto.');
 
+  const chartCard = rows.length ? `
+    <div class="card chart-card">
+      <div class="card-title">Presupuesto vs. gasto real</div>
+      <canvas id="chart-presupuesto"></canvas>
+    </div>
+  ` : '';
+
   return `
     <div class="section-head"><h2>Presupuesto</h2><button class="btn primary small" data-action="new" data-sheet="Budget">+ Categoría</button></div>
+    ${chartCard}
     ${items}
   `;
+}
+
+function initPresupuestoChart() {
+  if (typeof Chart === 'undefined') return;
+  if (ChartInstances.presupuesto) { ChartInstances.presupuesto.destroy(); delete ChartInstances.presupuesto; }
+  const el = document.getElementById('chart-presupuesto');
+  if (!el) return;
+  const rows = State.budgetRows();
+  ChartInstances.presupuesto = new Chart(el, {
+    type: 'bar',
+    data: {
+      labels: rows.map((r) => r.category),
+      datasets: [
+        { label: 'Presupuesto', data: rows.map((r) => Number(r.budgetAmount) || 0), backgroundColor: 'rgba(147,172,173,0.35)', borderRadius: 4 },
+        { label: 'Gastado', data: rows.map((r) => r.gastado), backgroundColor: '#E8B94A', borderRadius: 4 }
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { labels: { color: '#93ACAD', font: { size: 10 } } } },
+      scales: {
+        x: { ticks: { color: '#93ACAD', font: { size: 10 } }, grid: { display: false } },
+        y: { ticks: { color: '#93ACAD', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.08)' } }
+      }
+    }
+  });
 }
 
 // -------------------------------------------------------------- ALOJAMIENTO

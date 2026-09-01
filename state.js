@@ -121,6 +121,23 @@ const State = {
     };
   },
 
+  // ---- evolución de la caja ----
+  cashBalanceOverTime(currency) {
+    const cur = currency || 'ARS';
+    const txns = this.CashTransactions
+      .filter((t) => (t.currency || 'ARS') === cur)
+      .slice()
+      .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    let running = 0;
+    const points = [];
+    txns.forEach((t) => {
+      const amt = Number(t.amount) || 0;
+      running += t.type === 'INGRESO' ? amt : -amt;
+      points.push({ date: t.date, balance: running });
+    });
+    return points;
+  },
+
   // ---- tareas / compras / mantenimiento pendientes ----
   pendingTasks() {
     return this.Tasks.filter((t) => t.status !== 'Hecho' && t.status !== 'Cancelado');
