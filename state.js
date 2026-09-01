@@ -28,8 +28,15 @@ const State = {
   },
 
   // ---- helpers de fecha ----
+  // Google Sheets a veces auto-convierte celdas con formato de fecha
+  // ("2026-11-19") en un valor de tipo Fecha real, que Apps Script serializa
+  // como ISO completo con hora/zona ("2026-11-19T00:00:00.000Z"). Tomamos
+  // siempre los primeros 10 caracteres (YYYY-MM-DD) para que no rompa el
+  // cálculo sea cual sea el formato real de la celda.
   daysUntil(dateStr) {
-    const target = new Date(dateStr + 'T00:00:00');
+    if (!dateStr) return NaN;
+    const datePart = String(dateStr).slice(0, 10);
+    const target = new Date(datePart + 'T00:00:00');
     const now = new Date();
     const t0 = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     return Math.round((target - t0) / 86400000);
@@ -40,6 +47,7 @@ const State = {
     const ret = this.config.checkOutLimit ? this.config.checkOutLimit.slice(0, 10) : null;
     if (!dep) return 'pre';
     const days = this.daysUntil(dep);
+    if (Number.isNaN(days)) return 'pre';
     if (days > 0) return 'pre';
     if (ret && this.daysUntil(ret) < 0) return 'post';
     if (days === 0) return 'start';

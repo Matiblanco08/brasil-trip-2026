@@ -31,7 +31,7 @@ function renderDashboard() {
   const cfg = State.config;
   const days = State.daysUntil(cfg.departureDate);
   const phase = State.tripPhase();
-  let flag = `FALTAN ${days} DÍAS`;
+  let flag = Number.isNaN(days) ? 'FECHA DE SALIDA SIN CONFIGURAR' : `FALTAN ${days} DÍAS`;
   if (phase === 'start') flag = '🚗 ¡HOY COMIENZA EL VIAJE!';
   if (phase === 'during') flag = '🌴 VIAJE EN CURSO';
   if (phase === 'post') flag = '🏠 VIAJE FINALIZADO';
@@ -83,7 +83,7 @@ function renderDashboard() {
   return `
     <div class="countdown-hero">
       <div class="flag">🇧🇷 ${esc(cfg.tripName || 'VIAJE A BRASIL')} · ${esc(cfg.travelerA)} ❤️ ${esc(cfg.travelerB)}</div>
-      <div class="countdown-number">${{ pre: days, start: '🚗', during: '🌴', post: '🏠' }[phase]}</div>
+      <div class="countdown-number">${{ pre: (Number.isNaN(days) ? '—' : days), start: '🚗', during: '🌴', post: '🏠' }[phase]}</div>
       <div class="countdown-label">${flag}</div>
       <div class="hero-meta">
         <div class="hero-meta-item"><div class="v">${totalKm || '—'} km</div><div class="l">Ruta</div></div>
